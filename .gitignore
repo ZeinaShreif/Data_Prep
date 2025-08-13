@@ -1,2 +1,4 @@
 .ipynb_checkpoints/
 Data/
+catboost_info/
+__pycache__/
