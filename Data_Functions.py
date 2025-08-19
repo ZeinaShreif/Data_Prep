@@ -267,3 +267,35 @@ def Clean_and_dropna(df_orig, df_test_orig):
     df_test_clean = df_test.dropna(axis = 0, how = 'any').copy()
 
     return df_clean, df_test_clean
+
+def Get_Regions(df, feature, Region, bins_edges):
+    Regions = []
+    nbins = len(bins_edges)
+
+    Region_null = f'{Region}_0'
+    if df[feature].isnull().any():
+        df[Region_null] = df[feature].isnull().astype(int)
+        Regions.append(Region_null)
+    
+    for k in range(nbins):
+        Region_name = f'{Region}_{k + 1}'
+        Regions.append(Region_name)
+        if k == nbins - 1:
+            df[Region_name] = df[feature] >= bins_edges[k]
+        else:
+            df[Region_name] = (df[feature] >= bins_edges[k]) & (df[feature] < bins_edges[k + 1])
+
+        df[Region_name] = df[Region_name].fillna(False).astype(int)
+
+    df[Region] = df[Regions].idxmax(axis = 1)
+    df[Region] = df[Region].str.replace(f'{Region}_', '').astype(int)
+
+    if Region_null in Regions:
+        df[Region] = df[Region].replace(0, np.nan)
+        Regions.remove(Region_null)
+        df.drop(Region_null, axis = 1, inplace = True)
+        mask = df[Region].isnull()
+        for region in Regions:
+            df.loc[mask, region] = df.loc[mask, region].replace(0, np.nan)
+
+    return df
