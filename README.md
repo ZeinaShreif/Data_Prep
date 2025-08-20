@@ -1,6 +1,6 @@
-# Data_Prep: Exploratory Analysis, Feature Engineering, Feature Selection, Data Cleaning/Imputation
+# <span style = "color:purple">Data_Prep: Exploratory Analysis, Feature Engineering, Feature Selection, Data Cleaning/Imputation</span>
 This project demonstrates the workflow for preparing data for a classification task. I begin with exploratory analysis, then perform feature engineering to extract additional features from the raw data. Next, I conduct preliminary data cleaning using insights from the exploratory and feature-engineering steps and test various imputation methods. Finally, I demonstrate feature selection on the cleaned data as described below.
-## Exploratory Data Analysis
+## <span style = "color:purple">Exploratory Data Analysis</span>
 
 The goal of exploratory data analysis is to understand data quality, distributions, relationships, and to prepare for robust feature engineering, informed imputation, and feature selection ahead of modeling.
 
@@ -32,17 +32,17 @@ The goal of exploratory data analysis is to understand data quality, distributio
 
 ### 3. Numerical Features
 
-1. **Distribution Plots**:
+* **Distribution Plots**:
 
    * Histograms and KDE plots for each numerical feature.
    * Overlaid target classes (hue) to detect differences between classes.
 
-2. **Pairwise Relationships**:
+* **Pairwise Relationships**:
 
    * PairGrid with KDE contours on lower/upper triangles and KDE on diagonal.
    * Numerical features statistics vs binned features
 
-3. **Feature–Target Mutual Information**:
+* **Feature–Target Mutual Information**:
 
    * Computed pairwise mutual information among numerical features.
    * Computed mutual information between each numerical feature and the binary target.
@@ -52,15 +52,15 @@ The goal of exploratory data analysis is to understand data quality, distributio
 
 ### 4. Categorical Features
 
-1. **Cardinality**:
+* **Cardinality**:
 
    * Counted unique levels in each categorical column to identify high-cardinality features.
 
-2. **Gridplot of Histograms**:
+* **Gridplot of Histograms**:
 
    * Custom grid of proportional histograms: each subplot shows distribution of one categorical feature, with hue by another feature (including the target).
 
-3. **Mutual Information**:
+* **Mutual Information**:
 
    * Computed MI matrices for categorical variables (treating them as discrete).
    * Computed MI between each categorical feature and the target.
@@ -76,6 +76,52 @@ The goal of exploratory data analysis is to understand data quality, distributio
 * Identified a possible method to combine or bin some of the numerical features. I will look at these in more depth later (see Feature Engineering)
 * Identified some features to possibly dismiss. This will be determined later (see Feature Selection)
 * Identified Categorical Features that can be concatenated to create a composite feature.
+
+## <span style = "color:purple">Feature Engineering</span>
+
+The goal of featrure engineering is to explore relationships between features and between features and target variable in order to generate meaningful new features by transforming, combining, and/or encoding existing ones.
+
+---
+
+### 1. Numerical Features
+
+* **Correlation Analysis**: 
+   * Plotted pairwise correlations between numerical variables to identify redundancy and strong associations with the target.
+* **Distribution Plots**:
+   * Used histograms, empirical cumulative distribution functions, violin plots, and pairplots to examine the shape, spread, and overlaps in distributions
+   * Analysed the distributions as a function of the target and other binary features with strong correlation with the target.
+* **Feature Transformations**:
+   * Considered binning continuous variables into intervals based on observed trends
+   * Created combined features and transformed some into binary based on observations showing potential signal
+* **Feature effect on target Predictability**:
+   * Compared the usefulness of the original features and the engineered features on several baseline algorithms (see below)
+
+---
+
+### 2. Categorical Features
+
+* **Low Cardinality Nominal Variables**: 
+   * Combined selected features where interactions revealed meaningful separations in the target distribution
+   * Applied one-hot encoding
+* **Low Cardinality Ordinal Variables**:
+   * Transformed selected features into binary variables whenever splits showed potential predictive signal
+   * Treated most as numeric features to respect inherent ordering
+* **High Cardinality Variables**:
+   * Grouped/binned into small number of categories based on observed frequencies and target-driven insights
+   * Tested whether binning improved predictive power across models
+
+---
+
+### 3. Model Benchmarking
+
+To measure the usefulness of engineered features, I tested several baseline algorithms:
+
+* **Naive Bayes**
+* **Logistic Regression**
+* **LightGBM**
+* **CatBoost**
+
+Model performance was evaluated using 10-fold cross-validation, using both the mean classification accuracy and standard deviation across folds.
 
 
 
