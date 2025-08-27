@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
-from statsmodels.graphics.mosaicplot import mosaic
+# from statsmodels.graphics.mosaicplot import mosaic
 import numpy as np
 
 def Plot_Distributions(Class_Distribution, Class_Distribution_Norm, title):
@@ -83,26 +83,26 @@ def Plot_Stats(df, cat, stats, ncols = 2):
     plt.tight_layout()
     plt.show()
 
-def Get_Mosaic(df, features, target):
-    n = len(features)
-    ncols = 2
-    if n < ncols:
-        ncols = n
-        nrows = 1
-    elif n % ncols == 0:
-        nrows = n // ncols
-    else:
-        nrows = n // ncols + 1
+# def Get_Mosaic(df, features, target):
+#     n = len(features)
+#     ncols = 2
+#     if n < ncols:
+#         ncols = n
+#         nrows = 1
+#     elif n % ncols == 0:
+#         nrows = n // ncols
+#     else:
+#         nrows = n // ncols + 1
 
-    fig, axes = plt.subplots(nrows, ncols, figsize = (ncols*9, nrows*6))
-    axes = axes.flatten()
+#     fig, axes = plt.subplots(nrows, ncols, figsize = (ncols*9, nrows*6))
+#     axes = axes.flatten()
 
-    for ax, feature in zip(axes, features):
-        mosaic(df, [feature, target], ax = ax)
-        ax.set_title(feature)
+#     for ax, feature in zip(axes, features):
+#         mosaic(df, [feature, target], ax = ax)
+#         ax.set_title(feature)
         
-    plt.tight_layout()
-    plt.show()
+#     plt.tight_layout()
+#     plt.show()
 
 def Gridplot_Hists(df_orig, features, max_cats = 5):
     df = df_orig[features].dropna().copy()
@@ -274,7 +274,7 @@ def plot_ratios_by_Cryo_and_Transported(df, feature, nbins = None, cat = False, 
     df_num['Transported in CryoSleep'] = np.where(mask_T & mask_C, 1, 0)
     df_num['Transported not in CryoSleep'] = np.where(mask_T & ~mask_C, 1, 0)
 
-    df_num_groups = df_num.groupby(group).agg(
+    df_num_groups = df_num.groupby(by = group, observed = False).agg(
         **{'Total Count': (feature, 'count'), 
            'Total in CryoSleep': ('CryoSleep', 'sum'), 
            'Total Transported': ('Transported', 'sum'), 
