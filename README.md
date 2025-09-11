@@ -1,4 +1,4 @@
-# <span style = "color:purple">Data_Prep: Exploratory Analysis, Feature Engineering, Feature Selection, Data Cleaning/Imputation</span>
+u# <span style = "color:purple">Data Preparation: Exploratory Analysis, Feature Engineering, Feature Selection, Data Cleaning/Imputation</span>
 This project demonstrates the workflow for preparing data for a classification task. I begin with exploratory analysis, then perform feature engineering to extract additional features from the raw data. Next, I conduct preliminary data cleaning using insights from the exploratory and feature-engineering steps and test various imputation methods. Finally, I demonstrate feature selection on the cleaned data as described below.
 
 ## <span style = "color:purple">Exploratory Data Analysis</span>
@@ -81,7 +81,7 @@ The goal of exploratory data analysis is to understand data quality, distributio
 
 ## <span style = "color:purple">Feature Engineering</span>
 
-The goal of featrure engineering is to explore relationships between features and between features and target variable in order to generate meaningful new features by transforming, combining, and/or encoding existing ones.
+The goal of feature engineering is to explore relationships between features and between features and target variable in order to generate meaningful new features by transforming, combining, and/or encoding existing ones.
 
 ---
 
@@ -94,7 +94,7 @@ The goal of featrure engineering is to explore relationships between features an
 * **Distribution Plots**:
 
    * Used histograms, empirical cumulative distribution functions, violin plots, and pairplots to examine the shape, spread, and overlaps in distributions
-   * Analysed the distributions as a function of the target and other binary features with strong correlation with the target.
+   * Analyzed the distributions as a function of the target and other binary features with strong correlation with the target.
 
 * **Feature Transformations**:
 
@@ -189,10 +189,72 @@ To compare the imputation methods, I tested the data on several baseline algorit
 
 * **Logistic Regression**
 * **Random Forest**
-* **Support Vector**
+* **Support Vector Machine (SVM)**
 * **LightGBM**
 * **CatBoost**
 
 Model performance was evaluated using 10-fold or repeated 10-fold cross-validation, using both the mean classification scores and standard deviation across folds. The metric scores used: accuracy, roc_auc, f1, precision, and recall
 
 ---
+
+## <span style = "color:purple">Feature Selection</span>
+
+The goal of feature selection is to reduce redundancy in order to control overfitting and thus improve model performance and reduce computational cost. Furthermore, feature selection improves model interpretability as only the most informative predictors are retained. This stage was carried out after data cleaning and imputation to ensure that all candidate features were consistently available. I compare several selection strategies and evaluate them with CatBoostClassifier using a consistent cross-validation protocol.
+
+---
+
+### Methods Evaluated
+
+* Mutual Information (a Filter-Based Method)
+
+   * Compute the mutual information between each feature and the target and rank the features accordingly
+   * Evaluate the model performance selecting features with thresholds at ≥30% of the maximum MI, ≥10%, ≥5%, and all features with MI > 0.
+
+* Embedded Feature Importance (CatBoost)
+
+   * Train CatBoostClassifier model and rank features using the get_feature_importance catboost method.
+   * Evaluate the model performance selecting features with thresholds at ≥10% of the maximum importance, ≥1%, and all features with importance > 0.
+
+* Lasso Cross-Validation
+
+   * Fit LassoCV with 5-fold cross validation
+   * Evaluate the model performance keeping only features with non-zero coefficients, and also threshold by absolute coeffiecient at ≥30%, ≥10%, and ≥5% of the maximum absolute coefficient.
+
+* Permutation Importance
+
+   * Train CatBoostClassifier on the fold’s training partition and compute permutation importance on the fold’s validation split during repeated stratified 5-fold cross-validation. The final PI values are the mean PI across the folds
+   * Evaluate thresholds at ≥3% of the maximum PI, ≥1%, and all features with PI > 0.
+
+* Recursive Feature Elimination Cross Validation (a Wrapper-Based Method)
+
+   * Using CatBoostClassifier as estimator, eliminate the least important features
+   * Evaluate model performance with the selected subset compared to its performance using all features
+
+* Principal Component Analysis (PCA, Dimensionality Reduction)
+
+   * Replace original features with top-k principal componenets fitted on training data.
+   * Evaluate model performance keeping components by 90%, 95%, and 99% explained variance.
+
+---
+
+### Evaluation
+
+* Use Stratified 10-fold cross validation with CatBoostClassifier
+* Report the mean ± standard deviation for accuracy, roc_auc, f1, precision, recall on validation folds
+* Report each model's prediction accuracy on the held out test set
+
+----
+
+### Hyperparameter Optimization
+
+* Optimize CatBoostClassifier hyperparameters on the winning feature selection uing Optuna
+* Report final test evaluation using the best trial parameters
+
+---
+
+## <span style = "color:purple">Future Work</span>
+
+I will compare the performance of the optimized CatBoostClassifier against few neural network models tailored for tabular data:
+* Custom Multi-Layer Perceptron (MLP)
+* ResNet-style model (based on the ResNet-like architecture described in *Revisiting Deep Learning Models for Tabular Data*, Gorishney et al.)
+* FT-Transformer (as in Gorishney et al.) with some modifications

@@ -4,6 +4,14 @@ import numpy as np
 import string
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import  RobustScaler
+from sklearn.preprocessing import OrdinalEncoder
+from sklearn.feature_selection import mutual_info_classif
+from sklearn.linear_model import LassoCV
+from sklearn.inspection import permutation_importance
+from sklearn.feature_selection import RFECV
+from sklearn.decomposition import PCA
+from catboost import CatBoostClassifier, Pool
+from sklearn.model_selection import train_test_split, StratifiedKFold, RepeatedStratifiedKFold
 
 def Get_Data(filename):
     data = pd.read_csv(filename)
@@ -538,22 +546,10 @@ def Impute_df(df_orig, df_test_orig, impute_method = 'flag', flag_features = [],
     
     df_test['Transported'] = np.nan
     df_all = pd.concat([df, df_test])
-
-    Destination_Features = [col for col in df.columns if col.startswith('Destination_')]
-    HomePlanet_Features = [col for col in df.columns if col.startswith('HomePlanet_')]
-    deck_Features = [col for col in df.columns if col.startswith('deck_')]
-    Region_Features = [col for col in df.columns if col.startswith('Region_')]
-    Batch_Features = [col for col in df.columns if col.startswith('Batch_')]
-
-    eps = 1e-16
-    int_features = list({f for f in df_all.select_dtypes(include = 'number').columns if df_all[f].dropna().mod(1).abs().lt(eps).all()} - set(columns_to_drop))
-    bool_features = list({f for f in df_all.select_dtypes(include = 'object').columns if set(df_all[f].dropna().unique()).issubset({'True', 'False', 0, 1})} - set(columns_to_drop) - {'Transported'})
     
     if impute_method == 'flag':
         with pd.option_context('future.no_silent_downcasting', True):
             df_all_imputed = df_all.copy().drop(columns = columns_to_drop).fillna(-1).infer_objects(copy = False)
-        # df_all_imputed[int_features] = df_all_imputed[int_features].round(0).astype(int)
-        # df_all_imputed[bool_features] = df_all_imputed[bool_features].astype(int)
     elif (impute_method == 'Impute') | (impute_method == 'Impute_flag'):
         if impute_method == 'Impute_flag':
             df_all_imputed = Flag_Null(df_all, flag_features)
@@ -565,7 +561,15 @@ def Impute_df(df_orig, df_test_orig, impute_method = 'flag', flag_features = [],
         df_all_imputed = Impute_CryoSleep_VIP(df_all_imputed)
         df_all_imputed = Impute_Age_Luxury(df_all_imputed)
         df_all_imputed.drop(columns = columns_to_drop, inplace = True)
+
+        recalc_cols = ['CabinFamilySize', 'CabinGroupSize', 'CabinSize', 'FirstNameLength', 'LastNameLength', 'GroupFamilySize', 'FamilySize']
+        skewness = df_all_imputed[recalc_cols].skew().apply(np.abs)
+        skewed_features = skewness[skewness > 0.6].index.to_list()
+        df_all_imputed[skewed_features] = df_all_imputed[skewed_features].apply(np.log1p)
     
+    eps = 1e-16
+    int_features = list({f for f in df_all.select_dtypes(include = 'number').columns if df_all[f].dropna().mod(1).abs().lt(eps).all()} - set(columns_to_drop))
+    bool_features = list({f for f in df_all.select_dtypes(include = 'object').columns if set(df_all[f].dropna().unique()).issubset({'True', 'False', 0, 1})} - set(columns_to_drop) - {'Transported'})
     df_all_imputed[int_features] = df_all_imputed[int_features].round(0).astype(int)
     df_all_imputed[bool_features] = df_all_imputed[bool_features].astype(int)
     
@@ -724,14 +728,6 @@ def FindFill_missing_cabins(df_orig, deck, side, planets_to_mask, nround):
             if len(groups_in_cabin) == 1:
                 for k in range(len(null_cabin_rows)):
                     fill_cabin(cabin, null_cabin_rows.index[k], 4)
-#             else:
-#                 cabin_name = deck[-1] + '/' + str(cabin) + '/' + side[-1]
-#                 print(f'''{len(null_cabin_rows)} null rows:
-#                 {[null_cabin_rows.index[k] for k in range(len(null_cabin_rows))]} for missing cabin: {cabin_name}''')
-#         else:
-#             cabin_name = deck[-1] + '/' + str(cabin) + '/' + side[-1]
-#             print(f'''{len(null_cabin_rows)} null rows:
-#             {[null_cabin_rows.index[k] for k in range(len(null_cabin_rows))]} for missing cabin: {cabin_name}''')        
     return df
 
 def Impute_Family(df_orig):
@@ -960,3 +956,95 @@ def KNN_Impute_Features(df_orig, Imp_Features, Dep_Features, High_Dep_Features, 
     df[Imp_Features] = df_imputed[Imp_Features].values
     
     return df
+
+class FeatureImportance:
+    def __init__(self, X, y, Binary_Categorical = [], Ordinal_Categorical = [], Nominal_Categorical = [], random_state = 3):
+        self.X = X.copy()
+        self.y = y.copy()
+        self.random_state = random_state
+        self.Cat_Features = Binary_Categorical + Ordinal_Categorical + Nominal_Categorical
+        self.Nom_Cat_Features = Nominal_Categorical
+        assert(set(self.Cat_Features).issubset(set(self.X.columns)))
+        self.ohe_cols = [f'{col}_{c}' for col in self.Nom_Cat_Features for c in self.X[col].unique()]
+        self.catboost_params = {'iterations': 1000, 'learning_rate': 0.02, 'od_wait': 100, 'eval_metric': 'Accuracy', 
+                                'bootstrap_type': 'Bayesian', 'loss_function': 'Logloss', 'auto_class_weights': 'Balanced'}
+
+    def _mi_input(self):
+        cols_to_drop = list(set(self.ohe_cols) & set(self.X.columns))
+        X_clean = self.X.drop(columns = cols_to_drop).copy()
+        enc = OrdinalEncoder()
+        X_clean[self.Nom_Cat_Features] = enc.fit_transform(X_clean[self.Nom_Cat_Features])
+        discrete_mask = [feature in self.Cat_Features for feature in X_clean.columns]
+        return X_clean, discrete_mask
+
+    def _lasso_input(self):
+        if set(self.ohe_cols).issubset(set(self.X.columns)):
+            X_clean = self.X.drop(columns = self.Nom_Cat_Features).copy()
+        else:
+            cols_to_drop = list(set(self.ohe_cols) & set(self.X.columns))
+            X_clean = self.X.drop(columns = cols_to_drop).copy()
+            for feature in self.Nom_Cat_Features:
+                one_hot_encoded = pd.get_dummies(X_clean[feature], prefix = feature)
+                X_clean = pd.concat([X_clean, one_hot_encoded], axis = 1).drop(columns = self.Nom_Cat_Features)
+        return X_clean
+
+    def mutual_info(self, random_state = None):
+        rs = self.random_state if random_state is None else random_state
+        X_mi, discrete_mask = self._mi_input()
+        MI = mutual_info_classif(X_mi, self.y, discrete_features = discrete_mask, random_state = rs)
+        return pd.Series(MI, index = X_mi.columns.tolist()).sort_values(ascending = False)
+
+    def LCV_importance(self):
+        X_lcv = self._lasso_input()
+        lasso_cv = LassoCV(cv = 5)
+        lasso_cv.fit(X_lcv, self.y)
+        importance = np.abs(lasso_cv.coef_)
+        return pd.Series(importance, index = X_lcv.columns.tolist()).sort_values(ascending = False)
+
+    def catboost_perm_importance_cv(self, n_splits = 5, n_repeats = 3, n_repeats_pi = 100, model_params = None, random_state = None):
+        rs = self.random_state if random_state is None else random_state
+        X_clean, _ = self._mi_input()
+        params = self.catboost_params if model_params is None else model_params
+        
+        cv = RepeatedStratifiedKFold(n_splits = n_splits, n_repeats = n_repeats, random_state = rs)
+        features_importances = []
+
+        for fold, (train_idx, val_idx) in enumerate(cv.split(X_clean, self.y)):
+            X_train, X_val = X_clean.iloc[train_idx], X_clean.iloc[val_idx]
+            y_train, y_val = self.y.iloc[train_idx], self.y.iloc[val_idx]
+            
+            model = CatBoostClassifier(**params, verbose = False)
+            model.fit(X_train, y_train, eval_set = (X_val, y_val), use_best_model = True, verbose = False)
+
+            r = permutation_importance(model, X_val, y_val, n_repeats = n_repeats_pi)
+            features_importances.append(r['importances_mean'])
+        
+        return pd.Series(np.vstack(features_importances).mean(axis = 0), index = X_clean.columns.tolist()).sort_values(ascending = False)
+
+    def catboost_rfecv(self, step = 1, cv = 5, model_params = None, random_state = None):
+        rs = self.random_state if random_state is None else random_state
+        X_clean, _ = self._mi_input()
+        params = self.catboost_params if model_params is None else model_params
+        model = CatBoostClassifier(**params, verbose = False)
+        selector = RFECV(model, step = step, cv = cv)
+        selector = selector.fit(X_clean, self.y)
+        Features = np.array(X_clean.columns.to_list())
+        Selected_Features = Features[selector.support_]
+        return Selected_Features
+
+    def catboost_emb(self, model_params = None):
+        X_clean, _ = self._mi_input()
+        params = self.catboost_params if model_params is None else model_params
+        model = CatBoostClassifier(**params, verbose = False)
+        model.fit(X_clean, self.y)
+        return model.get_feature_importance(type = "PredictionValuesChange", prettified = True).set_index('Feature Id')
+
+    def Get_PCA_Input(self, v = 0.9):
+        scaler = RobustScaler()
+        X_clean = self._lasso_input()
+        X_scaled = scaler.fit_transform(X_clean)
+        if v == 1.0:
+            return X_scaled
+        else:
+            pca = PCA(n_components = v)
+            return pca.fit_transform(X_scaled)

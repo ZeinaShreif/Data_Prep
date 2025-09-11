@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
-# from statsmodels.graphics.mosaicplot import mosaic
 import numpy as np
 
 def Plot_Distributions(Class_Distribution, Class_Distribution_Norm, title):
@@ -195,7 +194,7 @@ def plot_corrs(X, cmap = 'coolwarm'):
     correlations = X.corr()
     mask = np.zeros_like(correlations, dtype = 'bool')
     mask[np.triu_indices_from(mask)] = True
-    fig, ax = plt.subplots(figsize = (d1, d2))
+    plt.subplots(figsize = (d1, d2))
     sns.heatmap(correlations, cmap = cmap, mask = mask)
     plt.show()
 
@@ -336,5 +335,41 @@ def plot_CryoTrans_Counts(df_orig, x, order):
     plt.xticks(rotation = 45)
     plt.ylabel('')
 
+    plt.tight_layout()
+    plt.show()
+
+def plot_Importance(MI, x_Name, t_Name, topk = 10, bottom = True, palette = "tab10"):
+    if topk == 'all':
+        top_features = MI
+        title = 'all Features'
+        bottom = False
+    else:
+        if topk > len(MI):
+            topk = len(MI)
+        top_features = MI[:topk]
+        title = f'Top {topk} Features'
+    
+    if bottom:
+        mask = MI != 0.0
+        bottom_features = MI[mask][-topk:]
+    
+        fig, axes = plt.subplots(nrows = 2, ncols = 1, figsize = (9, 12))
+    
+        sns.barplot(x = top_features.values, y = top_features.index, orient = 'h', ax = axes[0], hue = top_features.index, legend = False, palette = palette)
+        axes[0].set_xlabel(x_Name)
+        axes[0].set_ylabel('')
+        axes[0].set_title(f'{t_Name} values of {title}')
+        
+        sns.barplot(x = bottom_features.values, y = bottom_features.index, orient = 'h', ax = axes[1], hue = top_features.index, legend = False, palette = palette)
+        axes[1].set_xlabel(x_Name)
+        axes[1].set_ylabel('')
+        axes[1].set_title(f'Importance values of Bottom {topk} Non-Zero Features')
+    else:
+        plt.figure(figsize = (9, 6))
+        ax = sns.barplot(x = top_features.values, y = top_features.index, orient = 'h', hue = top_features.index, legend = False, palette = palette)
+        ax.set_xlabel(x_Name)
+        ax.set_ylabel('')
+        ax.set_title(f'{t_Name} values of {title}')
+        
     plt.tight_layout()
     plt.show()

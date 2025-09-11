@@ -1,7 +1,9 @@
 .ipynb_checkpoints/
 Data/
+Submissions
 catboost_info/
 __pycache__/
 .python-version
 uv.lock
 pyproject.toml
+*_copy.ipynb
