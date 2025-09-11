@@ -1,4 +1,4 @@
-u# <span style = "color:purple">Data Preparation: Exploratory Analysis, Feature Engineering, Feature Selection, Data Cleaning/Imputation</span>
+# <span style = "color:purple">Data Preparation: Exploratory Analysis, Feature Engineering, Feature Selection, Data Cleaning/Imputation</span>
 This project demonstrates the workflow for preparing data for a classification task. I begin with exploratory analysis, then perform feature engineering to extract additional features from the raw data. Next, I conduct preliminary data cleaning using insights from the exploratory and feature-engineering steps and test various imputation methods. Finally, I demonstrate feature selection on the cleaned data as described below.
 
 ## <span style = "color:purple">Exploratory Data Analysis</span>
