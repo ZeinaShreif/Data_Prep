@@ -285,14 +285,15 @@ def Clean_and_dropna(df_orig, df_test_orig):
 
     return df_clean, df_test_clean
 
-def Clean_and_preImpute(df_orig, df_test_orig):
+def Clean_and_preImpute(df_orig, df_test_orig, verbose = True):
     df = df_orig.copy()
     df_test = df_test_orig.copy()
     df_test['Transported'] = np.nan
     df_all = pd.concat([df, df_test])
 
-    print(f'Number of null rows before cleaning: {len(df_orig[df_orig.isnull().any(axis = 1)])} in training data\
-    and {len(df_test_orig[df_test_orig.isnull().any(axis = 1)])} in testing data')
+    if verbose:
+        print(f'Number of null rows before cleaning: {len(df_orig[df_orig.isnull().any(axis = 1)])} in training data\
+        and {len(df_test_orig[df_test_orig.isnull().any(axis = 1)])} in testing data')
     
     df_clean = Clean_Data(df_all)
 
@@ -306,7 +307,8 @@ def Clean_and_preImpute(df_orig, df_test_orig):
     
     skewness = df_clean[numerical_features].skew().apply(np.abs)
     skewed_features = skewness[skewness > 0.6].index.to_list()
-    print('skewed_features: ', skewed_features)
+    if verbose:
+        print('skewed_features: ', skewed_features)
     df_clean[skewed_features] = df_clean[skewed_features].apply(np.log1p)
 
     df_clean = Pre_Prep_Data(df_clean, nominal_features, binary_features)
@@ -315,11 +317,12 @@ def Clean_and_preImpute(df_orig, df_test_orig):
     df = df_clean.iloc[: len(df)]
     df_test = (df_clean.iloc[-len(df_test) :]).drop(columns = ['Transported'])
     
-    null_mask = df.isnull().any(axis = 1)
-    print(f'There are {len(df[null_mask])} remaining null rows in training data after cleaning')
+    if verbose:
+        null_mask = df.isnull().any(axis = 1)
+        print(f'There are {len(df[null_mask])} remaining null rows in training data after cleaning')
     
-    null_mask = df_test.isnull().any(axis = 1)
-    print(f'and {len(df_test[null_mask])} remaining null rows in test data')
+        null_mask = df_test.isnull().any(axis = 1)
+        print(f'and {len(df_test[null_mask])} remaining null rows in test data')
     
     return df, df_test
 
@@ -560,6 +563,10 @@ def Impute_df(df_orig, df_test_orig, impute_method = 'flag', flag_features = [],
         df_all_imputed = Impute_Planets(df_all_imputed)
         df_all_imputed = Impute_CryoSleep_VIP(df_all_imputed)
         df_all_imputed = Impute_Age_Luxury(df_all_imputed)
+        if df_all_imputed.Region.min() == 1:
+            df_all_imputed.Region -= 1
+        if df_all_imputed.Batch.min() == 1:
+            df_all_imputed.Batch -= 1
         df_all_imputed.drop(columns = columns_to_drop, inplace = True)
 
         recalc_cols = ['CabinFamilySize', 'CabinGroupSize', 'CabinSize', 'FirstNameLength', 'LastNameLength', 'GroupFamilySize', 'FamilySize']
