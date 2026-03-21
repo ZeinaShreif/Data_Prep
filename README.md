@@ -23,7 +23,7 @@ The goal of exploratory data analysis is to understand data quality, distributio
 
   * Generated a heatmap of nulls to visualize patterns and block structures.
   * Tabulated and plotted a bar chart of percentage missing per feature and per class to prioritize imputation.
-  * Here missing data seems to be at random.
+  * Computed missingness-indicator Phi coefficients (near-zero correlations) and ran **Little's MCAR test** (χ² = 80.79, df = 82, p = 0.517), confirming the data are **Missing Completely at Random (MCAR)**.
 
 * **Class Distribution**:
 
@@ -149,9 +149,8 @@ The goal of data cleaning and imputation is to resolve inconsistencies and fill 
 
 There are different types of missing values. Missing values that are independent of all other variables (observed features and target variable) are called Missing Completely at Random (MCAR). MCAR values can be dropped or imputed safely. Missing values that correlate with observed features but not target variable are called Missing at Random (MAR). For MAR values, we need to use imputation methods informed by related observed features. When missing values are dependent on the value of the missing data itself, Missing Not at Random (MNAR), then we need to model missingness as standard imputation methods would not be suitable.
 
-  * Analyzed patterns of the missing values across all features.
-  * Statistical checks confirmed that the data are **Missing Completely at Random (MCAR)**.
-  * While this means null rows could be dropped without introducing bias, doing so would reduce the training sample size significantly and leave missing values in the test set unresolved.
+  * Visualized missingness patterns via missingness matrices for both train and test sets, visually confirming the random structure established in EDA.
+  * Since the data are **MCAR** (confirmed in EDA), null rows could be dropped without introducing bias, but doing so would reduce the training sample size significantly and leave missing values in the test set unresolved.
 
 ---
 
@@ -162,6 +161,8 @@ Some missing values could be filled deterministically using **logical or domain-
 ---
 
 ### 3. Imputation Methods
+
+> **Note (Kaggle/tutorial context):** In this project, imputation is applied to train and test data jointly — they are concatenated before any cleaning or imputation runs, then split back afterward. This is valid here because the full test set is available upfront (as is typical in Kaggle competitions), and it allows group- and family-based rules to work across the split boundary. **In a real production setting this would not be appropriate**, since future data arrives after the model is deployed. In that case, all imputation parameters (KNN neighbors, lookup tables, statistical fallbacks) must be fitted on training data only and then applied to new data at inference time — or you should use models that handle missing values natively (e.g. CatBoost, LightGBM, XGBoost).
 
 For the remaining missing data, I applied three systematic approaches:
 
