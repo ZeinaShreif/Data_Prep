@@ -269,13 +269,13 @@ The goal of feature selection is to reduce redundancy in order to control overfi
 
 ## <span style = "color:purple">Deep Learning Models</span>
 
-I compare the performance of the optimized CatBoostClassifier against several neural network models tailored for tabular data, implemented in `DeepLearning_Models.py` and orchestrated via `DeepLearning.ipynb`.
+I compare the performance of the optimized CatBoostClassifier against several neural network models tailored for tabular data.
 
 ---
 
 ### Models
 
-* **Multi-Layer Perceptron (MLP)**: Fully connected network with batch normalization, dropout, and configurable activation functions (including mish).
+* **Multi-Layer Perceptron (MLP)**: Fully connected network with batch normalization, dropout, and custom activation functions.
 * **TabResNet**: ResNet-style architecture for tabular data with residual blocks, based on *Revisiting Deep Learning Models for Tabular Data* (Gorishniy et al.).
 * **Categorical Embedding MLP (CatEmb_MLP)**: MLP with learned embeddings for categorical features, allowing variable-size per-feature embedding dimensions.
 * **FT-Transformer**: Feature Tokenizer + Transformer architecture (Gorishniy et al.) with modifications including a parametric mish activation (PMish), GLU variants (ReGLU, GeGLU, MiGLU), linear and periodic continuous feature embeddings, and an MLP classification head.
@@ -284,8 +284,8 @@ I compare the performance of the optimized CatBoostClassifier against several ne
 
 ### Training & Evaluation
 
-* **Ensemble cross-validation**: Repeated Stratified K-Fold (default 12 folds, 5 repeats). Predictions are averaged across all folds.
-* **Calibration**: Post-hoc probability calibration via Temperature Scaling (TS), entropy-aware Heteroscedastic Temperature Scaling (HTS), and logit-aware HnLTS.
-* **Parallelism**: Fold-level parallelism using `ProcessPoolExecutor` with spawn workers and per-worker TF thread limiting for the FT-Transformer.
+* **Ensemble cross-validation**: Use repeated Stratified K-Fold and average predictions across all folds.
+* **Calibration**: I use an optional post-hoc probability calibration: Temperature Scaling (TS), entropy-aware Heteroscedastic Temperature Scaling (HTS), and logit-aware HnLTS.
+* **Parallelism**: This is optional and would depend on available CPUs.
 * **Data augmentation**: Optional mixup augmentation with Beta-distributed interpolation of continuous features and label-aware selection for categorical features.
-* **Hyperparameter tuning**: Optuna-based optimization for MLP, TabResNet, and CatEmb_MLP architectures.
+* **Hyperparameter tuning**: Use Optuna optimization for MLP, TabResNet, and CatEmb_MLP architectures.
