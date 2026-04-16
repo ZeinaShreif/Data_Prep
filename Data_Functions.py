@@ -2,19 +2,15 @@ import pandas as pd
 import numpy as np
 import string
 from sklearn.impute import KNNImputer
-from sklearn.preprocessing import RobustScaler
-from sklearn.preprocessing import OrdinalEncoder
+from sklearn.preprocessing import RobustScaler, OrdinalEncoder, StandardScaler
 from sklearn.feature_selection import mutual_info_regression, mutual_info_classif
 from sklearn.linear_model import LassoCV
 from sklearn.inspection import permutation_importance
 from sklearn.feature_selection import RFECV
 from sklearn.decomposition import PCA
-from catboost import CatBoostClassifier, Pool
-from sklearn.model_selection import (
-    train_test_split,
-    StratifiedKFold,
-    RepeatedStratifiedKFold,
-)
+from sklearn.cluster import KMeans
+from catboost import CatBoostClassifier
+from sklearn.model_selection import RepeatedStratifiedKFold
 
 
 def Get_Data(filename):
@@ -328,7 +324,9 @@ def Clean_Data(df_orig):
         & (df["Spa"] == 0)
         & (df["VRDeck"] == 0)
     )
-    mask2 = (df["Destination"] == "PSO J318.5-22") | (df["Destination"] == "Cancri e")
+    mask2 = (df["Destination"] == "PSO J318.5-22") | (
+        df["Destination"] == "55 Cancri e"
+    )
     mask3 = df["Age"] > 12
     mask = mask1 & mask2 & mask3
     df = fill_NA(df, mask, "CryoSleep", True)
@@ -482,7 +480,13 @@ def Clean_and_preImpute(df_orig, df_test_orig, verbose=True):
     skewed_features = skewness[skewness > 0.6].index.to_list()
     if verbose:
         print("skewed_features: ", skewed_features)
-    df_clean[skewed_features] = df_clean[skewed_features].apply(np.log1p)
+    luxury_cols = ["RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck"]
+    skewed_luxury = [f for f in skewed_features if f in luxury_cols]
+    skewed_other = [f for f in skewed_features if f not in luxury_cols]
+    if skewed_other:
+        df_clean[skewed_other] = df_clean[skewed_other].apply(np.log1p)
+    if skewed_luxury:
+        df_clean[skewed_luxury] = df_clean[skewed_luxury].apply(np.log1p)
 
     df_clean = Pre_Prep_Data(df_clean, nominal_features, binary_features)
     df_clean = Pre_Impute_Features(df_clean)
@@ -752,10 +756,14 @@ def Impute_df(
     df_orig,
     df_test_orig,
     impute_method="flag",
-    flag_features=[],
-    columns_to_drop=[],
+    flag_features=None,
+    columns_to_drop=None,
     regions_bin_edges=[0, 316, 758, 1137, 1516],
+    luxury_transform="log",
+    add_per_group=False,
 ):
+    flag_features = flag_features or []
+    columns_to_drop = columns_to_drop or []
     df = df_orig.copy()
     df_test = df_test_orig.copy()
 
@@ -784,7 +792,6 @@ def Impute_df(
             df_all_imputed.Region -= 1
         if df_all_imputed.Batch.min() == 1:
             df_all_imputed.Batch -= 1
-        df_all_imputed.drop(columns=columns_to_drop, inplace=True)
 
         recalc_cols0 = [
             "CabinFamilySize",
@@ -802,6 +809,21 @@ def Impute_df(
             df_all_imputed[skewed_features] = df_all_imputed[skewed_features].apply(
                 np.log1p
             )
+
+    luxury_cols = ["RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck"]
+
+    if luxury_cols and luxury_transform == "log_sqrt":
+        df_all_imputed[luxury_cols] = (
+            df_all_imputed[luxury_cols].apply(np.expm1).apply(np.sqrt).apply(np.log1p)
+        )
+
+    if add_per_group:
+        for feature in luxury_cols:
+            df_all_imputed["group_" + feature] = df_all_imputed.groupby("GroupId")[
+                feature
+            ].transform("mean")
+
+    df_all_imputed.drop(columns=columns_to_drop, inplace=True)
 
     eps = 1e-16
     int_features = list(
@@ -1468,3 +1490,76 @@ class FeatureImportance:
         else:
             pca = PCA(n_components=v)
             return pca.fit_transform(X_scaled)
+
+
+def Get_clusters(X, X2, X_test, X2_test, n_clusters, cluster_name):
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X2)
+    X_test_scaled = scaler.transform(X2_test)
+
+    kmeans = KMeans(n_clusters=n_clusters, n_init=10)
+    labels = kmeans.fit_predict(X_scaled)
+    test_labels = kmeans.predict(X_test_scaled)
+
+    X[cluster_name] = 0
+    X_test[cluster_name] = 0
+    X.loc[X2.index, cluster_name] = labels + 1
+    X_test.loc[X2_test.index, cluster_name] = test_labels + 1
+    X[cluster_name] = X[cluster_name].astype(int)
+    X_test[cluster_name] = X_test[cluster_name].astype(int)
+
+    return X, X_test
+
+
+def Add_Luxury_Clusters(X, X_test, n_clusters_ess=4, n_clusters_non_ess=8):
+    Lux_Essential = ["FoodCourt", "ShoppingMall"]
+    Lux_non_Essential = ["RoomService", "Spa", "VRDeck"]
+
+    mask = X.CryoSleep == 0
+    X_Lux_Ess = X[mask][Lux_Essential].copy()
+    X_Lux_non_Ess = X[mask][Lux_non_Essential].copy()
+
+    mask = X_test.CryoSleep == 0
+    X_test_Lux_Ess = X_test[mask][Lux_Essential].copy()
+    X_test_Lux_non_Ess = X_test[mask][Lux_non_Essential].copy()
+
+    X, X_test = Get_clusters(
+        X, X_Lux_Ess, X_test, X_test_Lux_Ess, n_clusters_ess, "Lux_Essential"
+    )
+    X, X_test = Get_clusters(
+        X,
+        X_Lux_non_Ess,
+        X_test,
+        X_test_Lux_non_Ess,
+        n_clusters_non_ess,
+        "Lux_non_Essential",
+    )
+
+    return X, X_test
+
+
+def Add_group_Luxury_Clusters(X, X_test, n_clusters_ess=4, n_clusters_non_ess=8):
+    Lux_Essential = ["group_FoodCourt", "group_ShoppingMall"]
+    Lux_non_Essential = ["group_RoomService", "group_Spa", "group_VRDeck"]
+
+    mask = X.CryoSleep == 0
+    X_Lux_Ess = X[mask][Lux_Essential].copy()
+    X_Lux_non_Ess = X[mask][Lux_non_Essential].copy()
+
+    mask = X_test.CryoSleep == 0
+    X_test_Lux_Ess = X_test[mask][Lux_Essential].copy()
+    X_test_Lux_non_Ess = X_test[mask][Lux_non_Essential].copy()
+
+    X, X_test = Get_clusters(
+        X, X_Lux_Ess, X_test, X_test_Lux_Ess, n_clusters_ess, "group_Lux_Essential"
+    )
+    X, X_test = Get_clusters(
+        X,
+        X_Lux_non_Ess,
+        X_test,
+        X_test_Lux_non_Ess,
+        n_clusters_non_ess,
+        "group_Lux_non_Essential",
+    )
+
+    return X, X_test

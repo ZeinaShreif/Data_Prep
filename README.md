@@ -1,5 +1,19 @@
-# <span style = "color:purple">Data Preparation: Exploratory Analysis, Feature Engineering, Feature Selection, Data Cleaning/Imputation</span>
-This project demonstrates the workflow for preparing data for a classification task. I begin with exploratory analysis, then perform feature engineering to extract additional features from the raw data. Next, I conduct preliminary data cleaning using insights from the exploratory and feature-engineering steps and test various imputation methods. Finally, I demonstrate feature selection on the cleaned data as described below.
+# <span style = "color:purple">Tabular Classification Pipeline: Exploratory Analysis, Feature Engineering, Feature Selection, Data Cleaning/Imputation, and Deep Learning Benchmarks</span>
+This project demonstrates the workflow for preparing data for a classification task. I begin with exploratory analysis, then perform feature engineering to extract additional features from the raw data. Next, I conduct preliminary data cleaning using insights from the exploratory and feature-engineering steps and test various imputation methods. I then demonstrate feature selection on the cleaned data as described below. Finally, I compare the winning CatBoost baseline against several deep learning architectures (MLP, TabResNet, CatEmb-MLP, FT-Transformer) with post-hoc calibration and fold-level ensembling.
+
+---
+
+## Table of Contents
+
+1. [Exploratory Data Analysis](#exploratory-data-analysis)
+2. [Feature Engineering](#feature-engineering)
+3. [Data Cleaning and Imputation](#data-cleaning-and-imputation)
+4. [Feature Selection](#feature-selection)
+5. [Hyperparameter Optimization](#hyperparameter-optimization)
+6. [Deep Learning Models](#deep-learning-models)
+7. [Results](#results)
+
+---
 
 ## <span style = "color:purple">Exploratory Data Analysis</span>
 
@@ -253,9 +267,25 @@ The goal of feature selection is to reduce redundancy in order to control overfi
 
 ---
 
-## <span style = "color:purple">Future Work</span>
+## <span style = "color:purple">Deep Learning Models</span>
 
-I will compare the performance of the optimized CatBoostClassifier against few neural network models tailored for tabular data:
-* Custom Multi-Layer Perceptron (MLP)
-* ResNet-style model (based on the ResNet-like architecture described in *Revisiting Deep Learning Models for Tabular Data*, Gorishney et al.)
-* FT-Transformer (as in Gorishney et al.) with some modifications
+I compare the performance of the optimized CatBoostClassifier against several neural network models tailored for tabular data, implemented in `DeepLearning_Models.py` and orchestrated via `DeepLearning.ipynb`.
+
+---
+
+### Models
+
+* **Multi-Layer Perceptron (MLP)**: Fully connected network with batch normalization, dropout, and configurable activation functions (including mish).
+* **TabResNet**: ResNet-style architecture for tabular data with residual blocks, based on *Revisiting Deep Learning Models for Tabular Data* (Gorishniy et al.).
+* **Categorical Embedding MLP (CatEmb_MLP)**: MLP with learned embeddings for categorical features, allowing variable-size per-feature embedding dimensions.
+* **FT-Transformer**: Feature Tokenizer + Transformer architecture (Gorishniy et al.) with modifications including a parametric mish activation (PMish), GLU variants (ReGLU, GeGLU, MiGLU), linear and periodic continuous feature embeddings, and an MLP classification head.
+
+---
+
+### Training & Evaluation
+
+* **Ensemble cross-validation**: Repeated Stratified K-Fold (default 12 folds, 5 repeats). Predictions are averaged across all folds.
+* **Calibration**: Post-hoc probability calibration via Temperature Scaling (TS), entropy-aware Heteroscedastic Temperature Scaling (HTS), and logit-aware HnLTS.
+* **Parallelism**: Fold-level parallelism using `ProcessPoolExecutor` with spawn workers and per-worker TF thread limiting for the FT-Transformer.
+* **Data augmentation**: Optional mixup augmentation with Beta-distributed interpolation of continuous features and label-aware selection for categorical features.
+* **Hyperparameter tuning**: Optuna-based optimization for MLP, TabResNet, and CatEmb_MLP architectures.

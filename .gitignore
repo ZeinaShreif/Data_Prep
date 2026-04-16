@@ -6,5 +6,3 @@ __pycache__/
 .python-version
 uv.lock
 pyproject.toml
-*_copy.ipynb
-CLAUDE.md
